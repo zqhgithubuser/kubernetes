@@ -5,5 +5,5 @@ $ kubectl create namespace guestbook
 
 Install chart
 ```
-$ helm -n guestbook install guestbook ./guestbook
+$ helm -n guestbook install guestbook ./guestbook --dependency-update
 ```
