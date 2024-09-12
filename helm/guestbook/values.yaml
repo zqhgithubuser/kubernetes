@@ -3,8 +3,9 @@ redis:
   auth:
     enabled: false
   # Disable AOF persistence for the backup/restore hook
-  commonConfiguration:
+  commonConfiguration: |
     appendonly no
+    enable-debug-command yes
   replica:
     persistence:
       enabled: false
@@ -26,12 +27,8 @@ image:
   tag: "v5"
 
 serviceAccount:
-  # Specifies whether a service account should be created
   create: true
-  # Annotations to add to the service account
   annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
   name: ""
 
 service:
