@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress
+  namespace: kube-example
+  labels:
+    app: wordpress
+spec:
+  selector:
+    app: wordpress
+    tier: frontend
+  type: LoadBalancer
+  ports:
+    - name: web
+      port: 80
+      targetPort: wdport
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress
+  namespace: kube-example
+  labels:
+    app: wordpress
+    tier: frontend
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: wordpress
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: wordpress
+        tier: frontend
+    spec:
+      affinity:
+        podAntiAffinity:  # Pod反亲和性
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              podAntiAffinity:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - wordpress
+      volumes:
+        - name: data
+          PersistentVolumeClaim:
+            claimName: wordpress-pvc
+      containers:
+        - name: wordpress
+          image: 'wordpress:6.1.1-apache'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: wdport
+          env:
+            - name: WORDPRESS_DB_HOST
+              value: 'mysql:3306'
+            - name: WORDPRESS_DB_USER
+              value: wordpress
+            - name: WORDPRESS_DB_NAME
+              value: wordpress
+            - name: WORDPRESS_DB_PASSWORD
+              value: wordpress
+          readinessProbe:
+            tcpSocket:
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          lifecycle:
+            preStop:
+              exec:
+                command: 
+                  - sh
+                  - '-c'
+                  - sleep 20  # 等待20秒以确保流量转移
+          resources:
+            requests:
+              cpu: 150m
+              memory: 150Mi
+            limits:
+              cpu: 150m
+              memory: 150Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/www/html
