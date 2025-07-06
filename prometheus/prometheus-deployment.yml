@@ -3,24 +3,38 @@ kind: ClusterRole
 metadata:
   name: prometheus
 rules:
-- apiGroups: [""]
-  resources:
-  - nodes
-  - nodes/metrics
-  - services
-  - pods
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["discovery.k8s.io"]
-  resources:
-  - endpointslices
-  verbs: ["get", "list", "watch"]
-- apiGroups:
-  - extensions
-  resources:
-  - ingresses
-  verbs: ["get", "list", "watch"]
-- nonResourceURLs: ["/metrics", "/metrics/cadvisor"]
-  verbs: ["get"]
+  - apiGroups:
+      - ''
+    resources:
+      - nodes
+      - nodes/metrics
+      - services
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - discovery.k8s.io
+    resources:
+      - endpointslices
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - nonResourceURLs:
+      - /metrics
+      - /metrics/cadvisor
+    verbs:
+      - get
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -37,9 +51,9 @@ roleRef:
   kind: ClusterRole
   name: prometheus
 subjects:
-- kind: ServiceAccount
-  name: prometheus
-  namespace: default
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: default
 ---
 apiVersion: v1
 data:
@@ -122,18 +136,18 @@ spec:
     spec:
       serviceAccountName: prometheus
       containers:
-      - name: prometheus
-        image: prom/prometheus:v2.37.0
-        ports:
-        - containerPort: 9090
-          name: default
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/prometheus
+        - name: prometheus
+          image: 'prom/prometheus:v2.37.0'
+          ports:
+            - containerPort: 9090
+              name: default
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/prometheus
       volumes:
-      - name: config-volume
-        configMap:
-         name: prometheus-config
+        - name: config-volume
+          configMap:
+            name: prometheus-config
 ---
 kind: Service
 apiVersion: v1
@@ -144,6 +158,6 @@ spec:
     app: prometheus
   type: LoadBalancer
   ports:
-  - protocol: TCP
-    port: 9090
-    targetPort: 9090
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090
