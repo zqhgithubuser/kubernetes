@@ -1,0 +1,16 @@
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: apisix-dashboard
+  namespace: apisix
+spec:
+  http:
+    - name: root
+      match:
+        hosts:
+          - dashboard.example.com
+        paths:
+          - /*
+      backends:
+        - serviceName: apisix-dashboard
+          servicePort: 80

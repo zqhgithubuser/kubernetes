@@ -1,0 +1,30 @@
+apisix:
+  enabled: true
+
+gateway:
+  type: NodePort
+  http:
+    enabled: true
+    servicePort: 80
+    containerPort: 9080
+  tls:
+    enabled: true
+    servicePort: 443
+    containerPort: 443
+
+etcd:
+  enabled: true
+  replicaCount: 1  # 默认为3
+  persistence:
+    enabled: true
+    storageClass: nfs-csi
+    
+dashboard:
+  enabled: true
+  
+ingress-controller:
+  enabled: true
+  config:
+    apisix:
+      serviceName: apisix-ingress-controller-admin
+      serviceNamespace: apisix-ingress-controller
