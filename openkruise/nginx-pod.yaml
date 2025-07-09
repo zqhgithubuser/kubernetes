@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: nginx  # 匹配 SidecarSet 指定的标签
+  name: nginx-pod
+spec:
+  containers:
+    - name: app
+      image: 'nginx:alpine'

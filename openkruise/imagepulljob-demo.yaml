@@ -1,0 +1,16 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: ImagePullJob
+metadata:
+  name: job-with-always
+spec:
+  image: 'nginx:1.9.1'
+  selector:
+    names:
+      - k8s-node01
+  completionPolicy:
+    type: Always
+    activeDeadlineSeconds: 1200
+    ttlSecondsAfterFinished: 300
+  pullPolicy:
+    backoffLimit: 3
+    timeoutSeconds: 300

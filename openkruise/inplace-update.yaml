@@ -1,0 +1,23 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: CloneSet
+metadata:
+  name: inplace-update
+spec:
+  replicas: 3
+  updateStrategy:
+    type: InPlaceIfPossible  # 就地升级容器
+    partition: 1  # 保留旧版本Pod的数量或百分比
+  selector:
+    matchLabels:
+      app: cs
+  template:
+    metadata:
+      labels:
+        app: cs
+    spec:
+      containers:
+        - name: nginx
+          image: 'nginx:1.20'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80

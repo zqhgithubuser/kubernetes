@@ -1,0 +1,22 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: AdvancedCronJob
+metadata:
+  name: acj-demo
+spec:
+  schedule: '*/1 * * * *'
+  template:
+    broadcastJobTemplate:
+      spec:
+        completionPolicy:
+          type: Always
+          ttlSecondsAfterFinished: 30
+        template:
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: counter
+                image: busybox
+                command:
+                  - /bin/sh
+                  - '-c'
+                  - for i in 1 2 3 4 5 6 7 8 9; do echo $i; done

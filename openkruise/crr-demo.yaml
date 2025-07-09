@@ -1,0 +1,15 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: ContainerRecreateRequest
+metadata:
+  name: crr-demo
+spec:
+  podName: pod-name
+  containers:
+    - name: app
+    - name: sidecar
+  strategy:
+    failurePolicy: Fail
+    orderedRecreate: false
+    terminationGracePeriodSeconds: 30
+    unreadyGracePeriodSeconds: 3
+    minStartedSeconds: 10

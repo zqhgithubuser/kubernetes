@@ -1,0 +1,23 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: SidecarSet
+metadata:
+  name: scs-demo
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  updateStrategy:
+    type: RollingUpdate
+    maxUnavailable: 1
+  containers:
+    - name: sidecar1
+      image: busybox
+      command:
+        - sleep
+        - 999d
+      volumeMounts:
+        - name: log-volume
+          mountPath: /var/log
+  volumes:
+    - name: log-volume
+      emptyDir: {}
