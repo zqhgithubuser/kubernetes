@@ -1,0 +1,21 @@
+apiVersion: rollouts.kruise.io/v1alpha1
+kind: Rollout
+metadata:
+  name: rollouts-demo
+  annotations:
+    rollouts.kruise.io/rolling-style: partition
+spec:
+  objectRef:
+    workloadRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: workload-demo
+  strategy:
+    canary:
+      steps:
+        - pause: {}
+          replicas: 1
+        - pause: {}
+          replicas: 50%
+        - pause: {}
+          replicas: 100%

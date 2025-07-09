@@ -1,0 +1,35 @@
+apiVersion: rollouts.kruise.io/v1alpha1
+kind: Rollout
+metadata:
+  name: rollouts-canary-demo
+  annotations:
+    rollouts.kruise.io/rolling-style: canary
+spec:
+  objectRef:
+    workloadRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: echoserver
+  strategy:
+    canary:
+      steps:
+        - weight: 5
+          pause: {}
+          replicas: 1
+        - weight: 40  # 分配40%的流量，没有指定replicas，表示发布40%的副本数
+          pause:
+            duration: 30  # 等待30s进入下一批
+        - weight: 60
+          pause:
+            duration: 30
+        - weight: 80
+          pause:
+            duration: 30
+        - weight: 100
+          pause:
+            duration: 30
+      trafficRoutings:
+        - service: echoserver
+          ingress:
+            classType: nginx
+            name: echoserver

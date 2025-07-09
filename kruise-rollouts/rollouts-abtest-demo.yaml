@@ -1,0 +1,31 @@
+apiVersion: rollouts.kruise.io/v1alpha1
+kind: Rollout
+metadata:
+  name: rollouts-abtest-demo
+  annotations:
+    rollouts.kruise.io/rolling-style: partition
+spec:
+  objectRef:
+    workloadRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: workload-abtest-demo
+  strategy:
+    canary:
+      steps:
+        - replicas: 1
+          pause: {}
+          matches:
+            - headers:
+                - key: user-agent
+                  type: Exact
+                  value: pc
+        - replicas: 50%
+          pause: {}
+        - replicas: 100%
+          pause: {}
+    trafficRoutings:
+      - service: service-demo
+        ingress:
+          classType: nginx
+          name: ingress-demo
