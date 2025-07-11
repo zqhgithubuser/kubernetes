@@ -1,0 +1,17 @@
+storageClasses:
+  - name: juicefs-sc
+    enabled: true
+
+    backend:
+      # The JuiceFS file system name
+      name: myjfs
+      # Connection URL for metadata engine (e.g. Redis), for community edition use only, ref: https://juicefs.com/docs/community/databases_for_metadata
+      metaurl: 'redis://redis.default.svc.cluster.local:6379/1'
+      # Object storage type, such as s3, gs, oss, for community edition use only, ref: https://juicefs.com/docs/community/how_to_setup_object_storage
+      storage: ''
+      # Bucket URL, for community edition use only, ref: https://juicefs.com/docs/community/how_to_setup_object_storage
+      bucket: ''
+      accessKey: ''
+      secretKey: ''
+
+    pathPattern: '${.PVC.namespace}-${.PVC.name}'
