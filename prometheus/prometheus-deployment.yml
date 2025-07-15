@@ -7,9 +7,22 @@ rules:
       - ''
     resources:
       - nodes
+      - nodes/proxy
       - nodes/metrics
       - services
+      - endpoints
       - pods
+      - ingresses
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses/status
+      - ingresses
     verbs:
       - get
       - list
@@ -22,17 +35,8 @@ rules:
       - get
       - list
       - watch
-  - apiGroups:
-      - extensions
-    resources:
-      - ingresses
-    verbs:
-      - get
-      - list
-      - watch
   - nonResourceURLs:
       - /metrics
-      - /metrics/cadvisor
     verbs:
       - get
 ---
@@ -40,90 +44,134 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: prometheus
-  namespace: default
+  namespace: monitor
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: monitor
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: prometheus
-subjects:
-  - kind: ServiceAccount
-    name: prometheus
-    namespace: default
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitor
 data:
   prometheus.yml: |
     global:
       scrape_interval: 10s
     scrape_configs:
-    - job_name: 'kubelet'
-      kubernetes_sd_configs:
-      - role: node
-      scheme: https
-      tls_config:
-        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        insecure_skip_verify: true  # Unfortunately required with Minikube.
-      authorization:
-        credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-    - job_name: 'cadvisor'
-      kubernetes_sd_configs:
-      - role: node
-      scheme: https
-      tls_config:
-        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        insecure_skip_verify: true  # Unfortunately required with Minikube.
-      authorization:
-        credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      metrics_path: /metrics/cadvisor
-    - job_name: 'k8apiserver'
-      kubernetes_sd_configs:
-      - role: endpointslice
-      scheme: https
-      tls_config:
-        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-      authorization:
-        credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpointslice_port_name]
-        action: keep
-        regex: default;kubernetes;https
-    - job_name: 'k8services'
-      kubernetes_sd_configs:
-      - role: endpointslice
-      relabel_configs:
-      - source_labels:
-          - __meta_kubernetes_namespace
-          - __meta_kubernetes_service_name
-        action: drop
-        regex: default;kubernetes
-      - source_labels:
-          - __meta_kubernetes_namespace
-        regex: default
-        action: keep
-      - source_labels: [__meta_kubernetes_service_name]
-        target_label: job
-    - job_name: 'k8pods'
-      kubernetes_sd_configs:
-      - role: pod
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_pod_container_port_name]
-        regex: metrics
-        action: keep
-      - source_labels: [__meta_kubernetes_pod_container_name]
-        target_label: job
-kind: ConfigMap
-metadata:
-  name: prometheus-config
+      - job_name: k8s-nodes
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - source_labels:
+              - __address__
+            target_label: __address__
+            regex: '(.*):10250'
+            replacement: '${1}.9100'
+            action: replace
+          - regex: __meta_kubernetes_node_label_(.+)
+            action: labelmap
+      - job_name: kubelet
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true
+        authorization:
+          credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - regex: __meta_kubernetes_node_label_(.+)
+            action: labelmap
+      - job_name: cadvisor
+        metrics_path: /metrics/cadvisor
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true
+        authorization:
+          credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - regex: __meta_kubernetes_node_label_(.+)
+            action: labelmap
+      - job_name: apiserver
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        relabel_configs:
+          - source_labels:
+              - __meta_kubernetes_namespace
+              - __meta_kubernetes_service_name
+              - __meta_kubernetes_endpoint_port_name
+            regex: default;kubernetes;https
+            action: keep
+      - job_name: k8s-endpoints
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels:
+              - __meta_kubernetes_service_annotation_prometheus_io_scrape
+            regex: true
+            action: keep
+          - source_labels:
+              - __meta_kubernetes_service_annotation_prometheus_io_scheme
+            target_label: __scheme__
+            regex: ^https?$
+            action: replace
+          - source_labels:
+              - __meta_kubernetes_service_annotation_prometheus_io_path
+            target_label: __metrics_path__
+            regex: (.*)
+            action: replace
+          - source_labels:
+              - __address__
+              - __meta_kubernetes_service_annotation_prometheus_io_port
+            target_label: __address__
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            action: replace
+          - source_labels:
+              - __meta_kubernetes_namespace
+              - __meta_kubernetes_service_name
+            regex: default;kubernetes
+            action: drop
+          - source_labels:
+              - __meta_kubernetes_namespace
+            target_label: namespace
+            action: replace
+          - source_labels:
+              - __meta_kubernetes_service_name
+            target_label: service
+            action: replace
+      - job_name: k8s-pods
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels:
+              - __meta_kubernetes_pod_container_port_name
+            regex: metrics
+            action: keep
+          - source_labels:
+              - __meta_kubernetes_pod_container_name
+            target_label: job
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: prometheus
+  namespace: monitor
 spec:
   selector:
     matchLabels:
@@ -138,9 +186,12 @@ spec:
       containers:
         - name: prometheus
           image: 'prom/prometheus:v2.37.0'
+          args:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--web.enable-lifecycle'
           ports:
             - containerPort: 9090
-              name: default
+              name: http
           volumeMounts:
             - name: config-volume
               mountPath: /etc/prometheus
@@ -153,11 +204,12 @@ kind: Service
 apiVersion: v1
 metadata:
   name: prometheus
+  namespace: monitor
 spec:
   selector:
     app: prometheus
-  type: LoadBalancer
+  type: NodePort
   ports:
     - protocol: TCP
       port: 9090
-      targetPort: 9090
+      targetPort: http
