@@ -26,6 +26,7 @@ spec:
             - '-rule=/config/*.yml'
             - '-datasource.url=http://vminsert.victoriametrics.svc.cluster.local:8481/select/0/prometheus'
             - '-remoteWrite.url=http://vminsert.victoriametrics.svc.cluster.local:8480/insert/0/prometheus'
+            - '-notifier.url=http://alertmanager.victoriametrics.svc.cluster.local:9093'
             - '-evaluationInterval=15s'
             - '-httpListenAddr=:8880'
             - '-envflag.enable=true'
