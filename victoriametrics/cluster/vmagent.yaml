@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vmagent
+  namespace: victoriametrics
+  labels:
+    app: vmagent
+spec:
+  serviceName: vmagent
+  selector:
+    matchLabels:
+      app: vmagent
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: vmagent
+    spec:
+      volumes:
+        - name: scrape-config
+          configMap:
+            name: vmagent-config
+      containers:
+        - name: vmagent
+          image: 'victoriametrics/vmagent:v1.121.0'
+          imagePullPolicy: IfNotPresent
+          args:
+            - '-promscrape.config=/config/scrape/scrape.yml'
+            - '-remoteWrite.tmpDataPath=/tmpData'
+            - '-promscrape.cluster.membersCount=2'
+            - '-promscrape.cluster.memberNum=$(POD_NAME)'
+            - '-remoteWrite.url=http://vminsert:8480/insert/0/prometheus'
+            - '--envflag.enable=true'
+            - '--envflag.prefix=VM_'
+            - '--loggerFormat=json'
+          ports:
+            - containerPort: 8429
+              name: http
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          livenessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+            tcpSocket:
+              port: http
+          readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+            httpGet:
+              path: /health
+              port: http
+          volumeMounts:
+            - mountPath: /config/scrape
+              name: scrape-config
+            - mountPath: /tmpData
+              name: tmpdata
+  volumeClaimTemplates:
+    - metadata:
+        name: tmpdata
+      spec:
+        storageClassName: nfs-csi
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 8Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vmagent-1
+  namespace: victoriametrics
+spec:
+  type: NodePort
+  selector:
+    app: vmagent
+    statefulset.kubernetes.io/pod-name: vmagent-1
+  ports:
+    - port: 8429
+      targetPort: http

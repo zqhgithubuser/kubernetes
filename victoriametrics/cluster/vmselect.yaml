@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vmselect
+  namespace: victoriametrics
+  labels:
+    app: vmselect
+spec:
+  selector:
+    matchLabels:
+      app: vmselect
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: vmselect
+    spec:
+      volumes:
+        - name: cache
+          emptyDir: {}
+      containers:
+        - name: vmselect
+          image: 'victoriametrics/vmselect:v1.121.0-cluster'
+          imagePullPolicy: IfNotPresent
+          args:
+            - '--cacheDataPath=/cache'
+            - '--storageNode=vmstorage-0.vmstorage.victoriametrics.svc.cluster.local:8401'
+            - '--storageNode=vmstorage-1.vmstorage.victoriametrics.svc.cluster.local:8401'
+            - '--envflag.enable=true'
+            - '--envflag.prefix=VM_'
+            - '--loggerFormat=json'
+          ports:
+            - containerPort: 8481
+              name: http
+          livenessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+            tcpSocket:
+              port: http
+          readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 10
+            httpGet:
+              path: /health
+              port: http
+          volumeMounts:
+            - mountPath: /cache
+              name: cache
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vmselect
+  namespace: victoriametrics
+  labels:
+    app: vmselect
+spec:
+  selector:
+    app: vmselect
+  ports:
+    - port: 8481
+      targetPort: http

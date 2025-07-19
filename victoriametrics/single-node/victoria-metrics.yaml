@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: victoria-metrics-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 20Gi
+  storageClassName: local-storage
+  local:
+    path: /data/k8s/vm
+  persistentVolumeReclaimPolicy: Retain
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - k8s-node01
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: victoria-metrics-data
+  namespace: victoriametrics
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: local-storage
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: victoria-metrics
+  namespace: victoriametrics
+spec:
+  selector:
+    matchLabels:
+      app: victoria-metrics
+  template:
+    metadata:
+      labels:
+        app: victoria-metrics
+    spec:
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: victoria-metrics-data
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+      containers:
+        - name: victoria-metrics
+          image: victoriametrics/victoria-metrics:v1.121.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - '-storageDataPath=/victoria-metrics-data'
+            - '-promscrape.config=/etc/prometheus/prometheus.yml'
+          ports:
+            - containerPort: 8428
+              name: http
+          volumeMounts:
+            - mountPath: /victoria-metrics-data
+              name: storage
+            - mountPath: /etc/prometheus
+              name: prometheus-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: victoria-metrics
+  namespace: victoriametrics
+spec:
+  type: NodePort
+  selector:
+    app: victoria-metrics
+  ports:
+    - port: 8428
+      targetPort: http

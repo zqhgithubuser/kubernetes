@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vminsert
+  namespace: victoriametrics
+  labels:
+    app: vminsert
+spec:
+  selector:
+    matchLabels:
+      app: vminsert
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: vminsert
+    spec:
+      containers:
+        - name: vminsert
+          image: 'victoriametrics/vminsert:v1.121.0-cluster'
+          imagePullPolicy: IfNotPresent
+          args:
+            - '--storageNode=vmstorage-0.vmstorage.victoriametrics.svc.cluster.local:8400'
+            - '--storageNode=vmstorage-1.vmstorage.victoriametrics.svc.cluster.local:8400'
+            - '--envflag.enable=true'
+            - '--envflag.prefix=VM_'
+            - '--loggerFormat=json'
+          ports:
+            - containerPort: 8480
+              name: http
+          livenessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+            tcpSocket:
+              port: http
+          readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 10
+            httpGet:
+              path: /health
+              port: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vminsert
+  namespace: victoriametrics
+  labels:
+    app: vminsert
+spec:
+  selector:
+    app: vminsert
+  ports:
+    - port: 8480
+      targetPort: http
