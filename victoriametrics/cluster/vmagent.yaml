@@ -29,7 +29,7 @@ spec:
             - '-remoteWrite.tmpDataPath=/tmpData'
             - '-promscrape.cluster.membersCount=2'
             - '-promscrape.cluster.memberNum=$(POD_NAME)'
-            - '-remoteWrite.url=http://vminsert:8480/insert/0/prometheus'
+            - '-remoteWrite.url=http://vminsert.victoriametrics.svc.cluster.local:8480/insert/0/prometheus'
             - '--envflag.enable=true'
             - '--envflag.prefix=VM_'
             - '--loggerFormat=json'
