@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vmalert
+  namespace: victoriametrics
+  labels:
+    app: vmalert
+spec:
+  selector:
+    matchLabels:
+      app: vmalert
+  template:
+    metadata:
+      labels:
+        app: vmalert
+    spec:
+      volumes:
+        - name: alerts-config
+          configMap:
+            name: vmalert-config
+      containers:
+        - name: vmalert
+          image: 'victoriametrics/vmalert:v1.121.0'
+          imagePullPolicy: IfNotPresent
+          args:
+            - '-rule=/config/*.yml'
+            - '-datasource.url=http://vminsert.victoriametrics.svc.cluster.local:8481/select/0/prometheus'
+            - '-remoteWrite.url=http://vminsert.victoriametrics.svc.cluster.local:8480/insert/0/prometheus'
+            - '-evaluationInterval=15s'
+            - '-httpListenAddr=:8880'
+            - '-envflag.enable=true'
+            - '-envflag.prefix=VM_'
+            - '-loggerFormat=json'
+          ports:
+            - containerPort: 8080
+              name: http
+          livenessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+            tcpSocket:
+              port: http
+          readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+            httpGet:
+              path: /health
+              port: http
+          volumeMounts:
+            - mountPath: /config
+              name: alerts-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vmalert
+  namespace: victoriametrics
+spec:
+  type: NodePort
+  selector:
+    app: vmalert
+  ports:
+    - port: 8080
+      targetPort: http
