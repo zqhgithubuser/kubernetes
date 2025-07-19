@@ -1,0 +1,9 @@
+operator:
+  # -- By default, operator converts prometheus-operator objects.
+  disable_prometheus_converter: false
+  # -- Enables ownership reference for converted prometheus-operator objects,
+  # it will remove corresponding victoria-metrics objects in case of deletion prometheus one.
+  enable_converter_ownership: false
+  # -- Enables custom config-reloader, bundled with operator.
+  # It should reduce vmagent and vmauth config sync-time and make it predictable.
+  useCustomConfigReloader: true
