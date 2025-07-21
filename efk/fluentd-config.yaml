@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-config
+  namespace: efk
+data:
+  containers.input.conf: |-
+    <source>
+      @id k8s_containers_logs
+      @type tail
+      path /var/log/containers/*.log
+      pos_file /var/log/k8s-contaienrs.log.pos
+      tag raw.kubernetes.*
+      read_from_head true
+      <parse>
+        # https://github.com/repeatedly/fluent-plugin-multi-format-parser
+        @type multi_format
+        <pattern>
+          format json
+          time_key time
+          time_format %Y-%m-%dT%H:%M:%S.%NZ
+        </pattern>
+        <pattern>
+          format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+          time_format %Y-%m-%dT%H:%M:%S.%N%:z
+        </pattern>
+      </parse>
+    </source>
+    
+    # https://github.com/GoogleCloudPlatform/fluent-plugin-detect-exceptions
+    <match raw.kubernetes.**>
+      @id detect_exceptions
+      @type detect_exceptions  # 将多行异常日志识别为一条日志
+      remove_tag_prefix raw 
+      message log
+      multiline_flush_interval 5
+    </match>
+    
+    # https://github.com/fluent-plugins-nursery/fluent-plugin-concat
+    <filter **>
+      @id concat_multiline_logs
+      @type concat
+      key message
+      multiline_end_regexp /\n$/
+      separator ""
+    </filter>
+    
+    # https://github.com/fabric8io/fluent-plugin-kubernetes_metadata_filter
+    <filter kubernetes.**>
+      @id k8s_metadata_enrich
+      @type kubernetes_metadata
+    </filter>
+    
+    # https://github.com/repeatedly/fluent-plugin-multi-format-parser
+    <filter kubernetes.**>
+      @id log_parser
+      @type parser
+      key_name log
+      reserve_data true
+      remove_key_name_field true
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+        </pattern>
+        <pattern>
+          format none
+        </pattern>
+      </parse>
+    </filter>
+    
+    <filter kubernetes.**>
+      @id remove_internal_fields
+      @type record_transformer
+      remove_keys $.docker.container_id,$.kubernetes.container_image_id,$.kubernetes.pod_id,$.kubernetes.namespace_id,$.kubernetes.master_url,$.kubernetes.labels.pod-template-hash
+    </filter>
+    
+    <filter kubernetes.**>
+      @id filter_by_logging_label
+      @type grep
+      <regexp>
+        key $.kubernetes.labels.logging
+        pattern ^true$
+      </regexp>
+    </filter>
+
+  forward.input.conf: |-
+    <source>
+      @id forward_input
+      @type forward
+    </source>
+
+  output.conf: |-
+    <match **>
+      @id output_to_elasticsearch
+      @type elasticsearch
+      @log_level info
+      include_tag_key true
+      host demo-es-internal-http
+      port 9200
+      user elastic
+      password 49iP1R6vZS5540V0CduxEUm1
+      logstash_format true
+      logstash_prefix k8s
+      request_timeout 30s
+      <buffer>
+        @type file
+        path /var/log/fluentd-buffers/kubernetes.system.buffer
+        flush_mode interval
+        retry_type exponential_backoff
+        flush_thread_count 2
+        flush_interval 5s
+        retry_forever
+        retry_max_interval 30
+        chunk_limit_size 2M
+        queue_limit_length 8
+        overflow_action block
+      </buffer>
+    </match>
